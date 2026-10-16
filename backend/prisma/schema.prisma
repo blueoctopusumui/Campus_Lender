@@ -1,0 +1,211 @@
+// CampusLend - 24BCE0246 Amani Yadav & 24BCE2516 Sanjana B S
+// Prisma Schema - All 11 tables mapped
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ─────────────────────────────────────────────
+// Role
+// ─────────────────────────────────────────────
+model Role {
+  roleId   Int    @id @default(autoincrement()) @map("role_id")
+  roleName String @unique @map("role_name") @db.VarChar(20)
+
+  users User[]
+
+  @@map("roles")
+}
+
+// ─────────────────────────────────────────────
+// Department
+// ─────────────────────────────────────────────
+model Department {
+  deptId   Int    @id @default(autoincrement()) @map("dept_id")
+  deptName String @unique @map("dept_name") @db.VarChar(100)
+
+  users User[]
+
+  @@map("departments")
+}
+
+// ─────────────────────────────────────────────
+// Category
+// ─────────────────────────────────────────────
+model Category {
+  categoryId   Int    @id @default(autoincrement()) @map("category_id")
+  categoryName String @unique @map("category_name") @db.VarChar(100)
+  maxLoanDays  Int    @default(7) @map("max_loan_days")
+  finePerDay   Decimal @default(5.00) @map("fine_per_day") @db.Decimal(8, 2)
+
+  items Item[]
+
+  @@map("categories")
+}
+
+// ─────────────────────────────────────────────
+// User
+// ─────────────────────────────────────────────
+model User {
+  userId       Int      @id @default(autoincrement()) @map("user_id")
+  fullName     String   @map("full_name") @db.VarChar(100)
+  email        String   @unique @db.VarChar(150)
+  regNo        String?  @unique @map("reg_no") @db.VarChar(20)
+  passwordHash String?  @map("password_hash") @db.VarChar(255)
+  phone        String?  @db.VarChar(15)
+  roleId       Int      @map("role_id")
+  deptId       Int?     @map("dept_id")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  role         Role        @relation(fields: [roleId], references: [roleId])
+  department   Department? @relation(fields: [deptId], references: [deptId])
+
+  ownedItems     Item[]            @relation("ItemOwner")
+  lendingRequests LendingRequest[] @relation("Borrower")
+  approvedLoans  Loan[]            @relation("ApprovedBy")
+  reviews        Review[]
+  notifications  Notification[]
+  auditLogs      AuditLog[]
+
+  @@map("users")
+}
+
+// ─────────────────────────────────────────────
+// Item
+// ─────────────────────────────────────────────
+model Item {
+  itemId        Int      @id @default(autoincrement()) @map("item_id")
+  title         String   @db.VarChar(150)
+  description   String?  @db.Text
+  itemCondition String   @default("GOOD") @map("item_condition") @db.VarChar(20)
+  status        String   @default("AVAILABLE") @db.VarChar(20)
+  ownerId       Int      @map("owner_id")
+  categoryId    Int      @map("category_id")
+  finePerDay    Decimal  @default(5.00) @map("fine_per_day") @db.Decimal(8, 2)
+  maxLoanDays   Int      @default(7) @map("max_loan_days")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  owner    User     @relation("ItemOwner", fields: [ownerId], references: [userId])
+  category Category @relation(fields: [categoryId], references: [categoryId])
+
+  lendingRequests LendingRequest[]
+
+  @@map("items")
+}
+
+// ─────────────────────────────────────────────
+// LendingRequest
+// ─────────────────────────────────────────────
+model LendingRequest {
+  requestId     Int      @id @default(autoincrement()) @map("request_id")
+  itemId        Int      @map("item_id")
+  borrowerId    Int      @map("borrower_id")
+  requestedFrom DateTime @map("requested_from")
+  requestedTo   DateTime @map("requested_to")
+  status        String   @default("PENDING") @db.VarChar(20)
+  remarks       String?  @db.Text
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  item     Item @relation(fields: [itemId], references: [itemId])
+  borrower User @relation("Borrower", fields: [borrowerId], references: [userId])
+
+  loan Loan?
+
+  @@map("lending_requests")
+}
+
+// ─────────────────────────────────────────────
+// Loan
+// ─────────────────────────────────────────────
+model Loan {
+  loanId          Int       @id @default(autoincrement()) @map("loan_id")
+  requestId       Int       @unique @map("request_id")
+  issuedAt        DateTime  @default(now()) @map("issued_at")
+  dueDate         DateTime  @map("due_date")
+  returnedAt      DateTime? @map("returned_at")
+  returnCondition String?   @map("return_condition") @db.VarChar(20)
+  approvedBy      Int       @map("approved_by")
+
+  request    LendingRequest @relation(fields: [requestId], references: [requestId])
+  approver   User           @relation("ApprovedBy", fields: [approvedBy], references: [userId])
+
+  fine         Fine?
+  reviews      Review[]
+  notifications Notification[]
+
+  @@map("loans")
+}
+
+// ─────────────────────────────────────────────
+// Fine
+// ─────────────────────────────────────────────
+model Fine {
+  fineId    Int       @id @default(autoincrement()) @map("fine_id")
+  loanId    Int       @unique @map("loan_id")
+  amount    Decimal   @db.Decimal(10, 2)
+  isPaid    Boolean   @default(false) @map("is_paid")
+  paidOn    DateTime? @map("paid_on")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  loan Loan @relation(fields: [loanId], references: [loanId])
+
+  @@map("fines")
+}
+
+// ─────────────────────────────────────────────
+// Review
+// ─────────────────────────────────────────────
+model Review {
+  reviewId   Int      @id @default(autoincrement()) @map("review_id")
+  loanId     Int      @map("loan_id")
+  reviewerId Int      @map("reviewer_id")
+  rating     Int
+  comment    String?  @db.Text
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  loan     Loan @relation(fields: [loanId], references: [loanId])
+  reviewer User @relation(fields: [reviewerId], references: [userId])
+
+  @@map("reviews")
+}
+
+// ─────────────────────────────────────────────
+// Notification
+// ─────────────────────────────────────────────
+model Notification {
+  notificationId   Int      @id @default(autoincrement()) @map("notification_id")
+  userId           Int      @map("user_id")
+  loanId           Int?     @map("loan_id")
+  notificationType String   @map("notification_type") @db.VarChar(50)
+  message          String   @db.Text
+  isRead           Boolean  @default(false) @map("is_read")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  user User  @relation(fields: [userId], references: [userId])
+  loan Loan? @relation(fields: [loanId], references: [loanId])
+
+  @@unique([loanId, notificationType])
+  @@map("notifications")
+}
+
+// ─────────────────────────────────────────────
+// AuditLog
+// ─────────────────────────────────────────────
+model AuditLog {
+  logId     Int      @id @default(autoincrement()) @map("log_id")
+  userId    Int?     @map("user_id")
+  action    String   @db.VarChar(50)
+  tableName String   @map("table_name") @db.VarChar(50)
+  recordId  Int?     @map("record_id")
+  loggedAt  DateTime @default(now()) @map("logged_at")
+
+  user User? @relation(fields: [userId], references: [userId])
+
+  @@map("audit_logs")
+}

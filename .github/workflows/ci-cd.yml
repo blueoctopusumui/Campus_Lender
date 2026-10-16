@@ -1,0 +1,96 @@
+name: CampusLend CI/CD Pipeline
+
+# Authors: Amani Yadav (24BCE0246) & Sanjana B S (24BCE2516)
+# Course: BCSE302P Database Systems Lab | Slot L25+L26
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main, dev ]
+
+jobs:
+  test-and-build:
+    name: Lint, Test & Build (Backend & Frontend)
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpassword123
+          MYSQL_DATABASE: campuslend
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: |
+            backend/package.json
+            frontend/package.json
+
+      # ── Backend CI ──────────────────────────────────────────────────────────
+      - name: Install Backend Dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Generate Prisma Client & Run DB Migrations / Push
+        working-directory: ./backend
+        env:
+          DATABASE_URL: "mysql://root:rootpassword123@127.0.0.1:3306/campuslend"
+        run: |
+          npx prisma db push --skip-generate
+          npx prisma generate
+
+      - name: Run Backend Tests
+        working-directory: ./backend
+        env:
+          NODE_ENV: test
+          DATABASE_URL: "mysql://root:rootpassword123@127.0.0.1:3306/campuslend"
+          JWT_SECRET: "test_jwt_secret_key"
+        run: |
+          npm test --if-present
+
+      # ── Frontend CI ─────────────────────────────────────────────────────────
+      - name: Install Frontend Dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Build Frontend (Vite)
+        working-directory: ./frontend
+        run: npm run build
+
+  docker-build:
+    name: Docker Build & Verification
+    needs: test-and-build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Backend Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: false
+          tags: campuslend-backend:latest
+
+      - name: Build Frontend Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: false
+          tags: campuslend-frontend:latest
