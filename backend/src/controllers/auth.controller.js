@@ -10,7 +10,7 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax',
+  sameSite: 'none',
   path: '/',
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
 };
@@ -232,12 +232,12 @@ export const localLogin_24BCE2516 = async (req, res, next) => {
 
 // ── Logout ───────────────────────────────────────────────────────────────────
 export const logout_24BCE2516 = (_req, res) => {
-  res.clearCookie('token', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-  });
+ res.clearCookie('token', {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'none',
+  path: '/',
+});
   res.json({ success: true, message: 'Logged out successfully.' });
 };
 
