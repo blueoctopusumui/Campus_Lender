@@ -1,8 +1,15 @@
 // CampusLend API Client
 import axios from 'axios';
 
+// In production: use the deployed backend URL from .env
+// In local dev:  use /api so Vite proxy forwards to localhost:5000
+console.log('API BASE URL:', import.meta.env.VITE_API_BASE_URL);
+const baseURL = import.meta.env.VITE_API_BASE_URL
+  ? `${import.meta.env.VITE_API_BASE_URL}/api`
+  : '/api';
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL,
   withCredentials: true,           // Always send the httpOnly session cookie
   headers: { 'Content-Type': 'application/json' }
 });
